@@ -507,7 +507,7 @@ local ScriptSource = 'loadstring(game:HttpGet("https://raw.githubusercontent.com
 
 local QueueOnTeleport = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
 
-MenuGroup:AddToggle("AutoExecute", { Text = "Auto execute", Default = false, Tooltip = "Re-executes the script when you serverhop or rejoin" })
+MenuGroup:AddToggle("AutoExecute", { Text = "Auto execute", Default = true, Tooltip = "Re-executes the script when you serverhop or rejoin" })
 
 Players.LocalPlayer.OnTeleport:Connect(function(State)
 	if Toggles.AutoExecute and Toggles.AutoExecute.Value and QueueOnTeleport and State ~= Enum.TeleportState.Failed then
