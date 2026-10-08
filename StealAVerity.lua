@@ -303,7 +303,8 @@ local BOSS_ATTACKS = {
     BossBlink = 3.5,
     BossCharge = 4,
     BossDive = 2.5,
-    BossBomb = 4,
+    BossBomb = 6,
+    BossChargeWarn = 4,
     BossSlam = 2.5,
     BossNuke = 5,
 }
