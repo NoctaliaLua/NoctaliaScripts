@@ -502,6 +502,19 @@ MenuGroup:AddToggle("KeybindNotification", {Text = "Keybind notification", Defau
 MenuGroup:AddToggle("BlurEnabled", {Text = "Blur", Default = false, Callback = function(Value) Library:SetBlur(Value) end})
 MenuGroup:AddToggle("DarkOverlay", {Text = "Dark", Default = true, Callback = function(Value) Library:SetDark(Value) end})
 MenuGroup:AddToggle("SnowEffect", {Text = "Snow", Default = true, Callback = function(Value) Library:SetSnow(Value) end})
+-- Set this to the loadstring URL you run this script from; it is re-run after a teleport
+local ScriptSource = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/NoctaliaLua/NoctaliaLoader/refs/heads/main/Loader.lua"))()'
+
+local QueueOnTeleport = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+
+MenuGroup:AddToggle("AutoExecute", { Text = "Auto execute", Default = false, Tooltip = "Re-executes the script when you serverhop or rejoin" })
+
+Players.LocalPlayer.OnTeleport:Connect(function(State)
+	if Toggles.AutoExecute and Toggles.AutoExecute.Value and QueueOnTeleport and State ~= Enum.TeleportState.Failed then
+		QueueOnTeleport(ScriptSource)
+	end
+end)
+
 MenuGroup:AddDivider()
 MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
