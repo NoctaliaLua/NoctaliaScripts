@@ -587,10 +587,22 @@ local QueueOnTeleport = queue_on_teleport or queueonteleport or (syn and syn.que
 
 MenuGroup:AddToggle("AutoExecute", { Text = "Auto execute", Default = true, Tooltip = "Re-executes the script when you serverhop or rejoin" })
 
-Players.LocalPlayer.OnTeleport:Connect(function(State)
-	if Toggles.AutoExecute and Toggles.AutoExecute.Value and QueueOnTeleport and State ~= Enum.TeleportState.Failed then
-		QueueOnTeleport(ScriptSource)
+-- OnTeleport fires once per teleport state (Started, RequestedFromServer, InProgress, ...), so queue only once per
+-- teleport or the script gets queued (and run) several times; a failed teleport re-arms the queue
+local Env = getgenv and getgenv() or _G
+if Env.NoctaliaTeleportConnection then
+	pcall(function() Env.NoctaliaTeleportConnection:Disconnect() end)
+end
+
+local TeleportQueued = false
+Env.NoctaliaTeleportConnection = Players.LocalPlayer.OnTeleport:Connect(function(State)
+	if State == Enum.TeleportState.Failed then
+		TeleportQueued = false
+		return
 	end
+	if TeleportQueued or not QueueOnTeleport or not (Toggles.AutoExecute and Toggles.AutoExecute.Value) then return end
+	TeleportQueued = true
+	QueueOnTeleport(ScriptSource)
 end)
 
 MenuGroup:AddDivider()
