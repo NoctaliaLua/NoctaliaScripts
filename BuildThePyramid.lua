@@ -106,8 +106,38 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 
 local Services = ReplicatedStorage.Packages._Index["sleitnick_knit@1.7.0"].knit.Services
-local Pickup = Services.BookService.RF.Pickup
-local PurchaseUpgrade = Services.DataService.RF.PurchaseUpgrade
+
+-- Finds a Knit RemoteFunction by name. Tries the expected service first, then scans every service,
+-- so the script survives the game renaming or moving a service.
+local function FindRF(remoteName, preferredService)
+    local function look(service)
+        local rf = service and service:FindFirstChild("RF")
+        return rf and rf:FindFirstChild(remoteName)
+    end
+
+    local deadline = tick() + 10
+    repeat
+        local found = look(Services:FindFirstChild(preferredService))
+        if found then return found end
+
+        for _, service in ipairs(Services:GetChildren()) do
+            found = look(service)
+            if found then return found end
+        end
+        task.wait(0.5)
+    until tick() >= deadline
+
+    local names = {}
+    for _, service in ipairs(Services:GetChildren()) do
+        table.insert(names, service.Name)
+    end
+    warn(("[Noctalia] RF '%s' not found. Services: %s"):format(remoteName, table.concat(names, ", ")))
+    Library:Notify(("Remote '%s' not found, check console"):format(remoteName), 5)
+    return nil
+end
+
+local Pickup = FindRF("Pickup", "BookService")
+local PurchaseUpgrade = FindRF("PurchaseUpgrade", "DataService")
 
 -- Settings
 local CORNER_A     = Vector3.new(117, 4, 200)   -- sweep corners (layer 1)
