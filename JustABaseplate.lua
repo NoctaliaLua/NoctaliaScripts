@@ -56,6 +56,7 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
 	Main = Window:AddTab("Main"),
+	Custom = Window:AddTab("Custom"),
 	Configs = Window:AddTab("Configs"),
 }
 
@@ -278,6 +279,174 @@ for _, Name in ipairs(Order) do
 	end
 end
 
+-- ============================================================================
+-- CUSTOM TAB
+-- ============================================================================
+local CUSTOM_PLACE_ID = 123974602339071
+local CUSTOM_FOLDER = "MyScriptHub/CustomButtons"
+local CUSTOM_FILE = CUSTOM_FOLDER .. "/buttons.json"
+local COMMAND_COUNT = 5
+
+local HttpService = game:GetService("HttpService")
+
+-- buttons are only loaded and saved in the supported place
+local CustomDisabledReason
+if game.PlaceId ~= CUSTOM_PLACE_ID then
+	CustomDisabledReason = "not saved: place id is " .. game.PlaceId .. ", expected " .. CUSTOM_PLACE_ID
+elseif not (writefile and readfile and isfile and isfolder and makefolder) then
+	CustomDisabledReason = "not saved: executor has no file functions"
+end
+local CustomEnabled = CustomDisabledReason == nil
+local CustomData = { Hats = {}, Scripts = {} }
+
+local function SaveCustom()
+	if not CustomEnabled then
+		Library:Notify("Button " .. CustomDisabledReason, 6)
+		return
+	end
+
+	local ok, err = pcall(function()
+		if not isfolder("MyScriptHub") then makefolder("MyScriptHub") end
+		if not isfolder(CUSTOM_FOLDER) then makefolder(CUSTOM_FOLDER) end
+		writefile(CUSTOM_FILE, HttpService:JSONEncode(CustomData))
+	end)
+	if not ok then
+		warn("Saving custom buttons failed: " .. tostring(err))
+		Library:Notify("Saving failed: " .. tostring(err), 6)
+	end
+end
+
+local function LoadCustom()
+	if not CustomEnabled or not isfile(CUSTOM_FILE) then return end
+
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(readfile(CUSTOM_FILE))
+	end)
+	if ok and typeof(data) == "table" then
+		CustomData.Hats = typeof(data.Hats) == "table" and data.Hats or {}
+		CustomData.Scripts = typeof(data.Scripts) == "table" and data.Scripts or {}
+	end
+end
+
+-- Commands starting with /e go through the chat bar, everything else through SendAsync
+local function SendCustomCommand(message)
+	local ok, err = pcall(function()
+		if message:sub(1, 2):lower() == "/e" then
+			TypeChat(message)
+		elseif TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			local channels = TextChatService:WaitForChild("TextChannels", 5)
+			local channel = channels and (channels:FindFirstChild("RBXGeneral") or channels:FindFirstChildWhichIsA("TextChannel"))
+			channel:SendAsync(message)
+		else
+			ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents", 5).SayMessageRequest:FireServer(message, "All")
+		end
+	end)
+
+	if not ok then
+		warn("Custom command failed: " .. tostring(err))
+		Library:Notify("Chat send failed: " .. tostring(err), 5)
+	end
+end
+
+local function RunCustomHat(commands)
+	task.spawn(function()
+		local first = true
+		for _, command in ipairs(commands) do
+			if command:match("%S") then
+				if not first then task.wait(0.3) end
+				first = false
+				SendCustomCommand(command)
+			end
+		end
+	end)
+end
+
+-- accepts a url or the script source itself
+local function RunCustomScript(script)
+	local ok, err = pcall(function()
+		local source = script
+		if script:match("^%s*https?://%S+%s*$") then
+			source = game:HttpGet((script:gsub("^%s+", ""):gsub("%s+$", "")))
+		end
+		loadstring(source)()
+	end)
+	if not ok then
+		warn("Custom script failed: " .. tostring(err))
+		Library:Notify("Custom script failed", 3)
+	end
+end
+
+local CustomHatsGroup = Tabs.Custom:AddLeftGroupbox("Custom Hats")
+local CustomScriptsGroup = Tabs.Custom:AddLeftGroupbox("Custom Scripts")
+local AddHatsGroup = Tabs.Custom:AddRightGroupbox("Add Hats")
+local AddScriptsGroup = Tabs.Custom:AddRightGroupbox("Add Scripts")
+
+local function AddHatButton(entry)
+	CustomHatsGroup:AddButton(entry.Name, function()
+		RunCustomHat(entry.Commands)
+	end)
+end
+
+local function AddScriptButton(entry)
+	CustomScriptsGroup:AddButton(entry.Name, function()
+		task.spawn(RunCustomScript, entry.Script)
+	end)
+end
+
+AddHatsGroup:AddButton("Add", function()
+	local name = Options.CustomHatName.Value
+	if not name:match("%S") then
+		Library:Notify("Enter a name first", 3)
+		return
+	end
+
+	local commands = {}
+	for i = 1, COMMAND_COUNT do
+		local box = Options["CustomHatCommand" .. i]
+		commands[i] = box.Value
+		box:SetValue("")
+	end
+	Options.CustomHatName:SetValue("")
+
+	local entry = { Name = name, Commands = commands }
+	table.insert(CustomData.Hats, entry)
+	AddHatButton(entry)
+	SaveCustom()
+end)
+
+AddHatsGroup:AddInput("CustomHatName", { Text = "Name", Placeholder = "Name" })
+for i = 1, COMMAND_COUNT do
+	AddHatsGroup:AddInput("CustomHatCommand" .. i, { Text = "Command " .. i, Placeholder = "Command " .. i })
+end
+
+AddScriptsGroup:AddButton("Add", function()
+	local name = Options.CustomScriptName.Value
+	local script = Options.CustomScriptSource.Value
+	if not name:match("%S") or not script:match("%S") then
+		Library:Notify("Enter a name and a script first", 3)
+		return
+	end
+
+	Options.CustomScriptName:SetValue("")
+	Options.CustomScriptSource:SetValue("")
+
+	local entry = { Name = name, Script = script }
+	table.insert(CustomData.Scripts, entry)
+	AddScriptButton(entry)
+	SaveCustom()
+end)
+
+AddScriptsGroup:AddInput("CustomScriptName", { Text = "Name", Placeholder = "Name" })
+AddScriptsGroup:AddInput("CustomScriptSource", { Text = "Script", Placeholder = "Script" })
+
+LoadCustom()
+for _, entry in ipairs(CustomData.Hats) do
+	AddHatButton(entry)
+end
+for _, entry in ipairs(CustomData.Scripts) do
+	AddScriptButton(entry)
+end
+
 --// Watermark \\--
 local StartTime = tick()
 
@@ -336,7 +505,10 @@ end)
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+SaveManager:SetIgnoreIndexes({
+	"MenuKeybind", "CustomHatName", "CustomHatCommand1", "CustomHatCommand2", "CustomHatCommand3",
+	"CustomHatCommand4", "CustomHatCommand5", "CustomScriptName", "CustomScriptSource",
+})
 ThemeManager:SetFolder("MyScriptHub")
 SaveManager:SetFolder("MyScriptHub/specific-game")
 SaveManager:SetSubFolder("specific-place")
